@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+// 包名，用于代码生成的命名空间等
+option go_package = "github.com/john/myproject/flyto;server";
+package server;
+
+message ClientInfo {
+  string server_port = 1; // 服务器端口
+  string client_ip = 2; // 客户端ip
+  string client_port = 3; // 客户端端口
+}
+
+// 定义消息结构体
+message RegisterRequest {
+  string client_id = 1; // 客户端id
+  repeated ClientInfo client_infos = 2; // 客户端信息
+}
+
+message RegisterResponse {
+  bool status = 1;
+}
+
+message PingRequest {
+  string client_id = 1; // 客户端id
+}
+
+message PingResponse {
+}
+
+// 定义服务和RPC接口
+service FlyToService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Ping(PingRequest) returns (PingResponse);
+}

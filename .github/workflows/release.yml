@@ -1,0 +1,85 @@
+name: Build Binaries
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+            archive: zip
+
+    runs-on: debian-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOARM: ${{ matrix.goarm }}
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Go 语言为例，请根据你使用的编译器调整
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: go mod download
+        run: go mod download
+
+      - name: Build flyto
+        run: |
+          mkdir -p dist
+          go build -o "dist/flyto${{ matrix.ext }}
+
+      - name: Archive artifact
+        run: |
+          if [ "${{ matrix.archive }}" == "zip" ]; then
+            cd dist && zip "flyto-${{ matrix.goos }}-${{ matrix.goarch }}.zip" "flyto${{ matrix.ext }}"
+          else
+            cd dist && tar -czvf "flyto-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz" "flyto${{ matrix.ext }}"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "flyto-${{ matrix.goos }}-${{ matrix.goarch }}"
+          path: |
+            dist/flyto-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+            dist/flyto-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+        if: always()
+
+  release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*/flyto-*.tar.gz
+            dist/*/flyto-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
