@@ -74,10 +74,10 @@ jobs:
     needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: dist
+#      - name: Download all artifacts
+#        uses: actions/download-artifact@v3
+#        with:
+#          path: dist
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
