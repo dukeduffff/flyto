@@ -51,7 +51,7 @@ jobs:
       - name: Build flyto
         run: |
           mkdir -p dist
-          go build -o "dist/flyto${{ matrix.ext }}
+          go build -o dist/flyto${{ matrix.ext }}
 
       - name: Archive artifact
         run: |
