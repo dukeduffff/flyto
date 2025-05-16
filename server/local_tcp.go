@@ -12,6 +12,56 @@ import (
 	"sync"
 )
 
+type SessionPortMap struct {
+	sessionPortMap map[*yamux.Session]map[string]struct{}
+	lock           sync.RWMutex
+}
+
+var sessionPortMap = &SessionPortMap{sessionPortMap: make(map[*yamux.Session]map[string]struct{}), lock: sync.RWMutex{}}
+
+func (s *SessionPortMap) Get(session *yamux.Session) (map[string]struct{}, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	if ports, ok := s.sessionPortMap[session]; ok {
+		return ports, nil
+	}
+	return nil, nil
+}
+
+func (s *SessionPortMap) Put(session *yamux.Session) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if _, ok := s.sessionPortMap[session]; ok {
+		return nil
+	}
+	s.sessionPortMap[session] = make(map[string]struct{})
+	return nil
+}
+
+func (s *SessionPortMap) AddSessionPort(session *yamux.Session, port string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if ports, ok := s.sessionPortMap[session]; ok {
+		ports[port] = struct{}{}
+	} else {
+		m := make(map[string]struct{})
+		m[port] = struct{}{}
+		s.sessionPortMap[session] = m
+	}
+	return nil
+}
+
+func (s *SessionPortMap) Remove(session *yamux.Session) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if ports, ok := s.sessionPortMap[session]; ok {
+		for port := range ports {
+			portListenMap.Remove(port)
+		}
+		delete(s.sessionPortMap, session)
+	}
+}
+
 type PortListenMap struct {
 	portListenMap map[string]net.Listener
 	lock          sync.RWMutex
@@ -31,9 +81,9 @@ func (p *PortListenMap) Get(port string) (net.Listener, error) {
 func (p *PortListenMap) Put(port string, listener net.Listener) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	if _, ok := p.portListenMap[port]; ok {
+	if oldListener, ok := p.portListenMap[port]; ok {
 		log.Printf("Port %s already exists, closing old listener", port)
-		p.portListenMap[port].Close()
+		oldListener.Close()
 	}
 	p.portListenMap[port] = listener
 }
@@ -76,19 +126,27 @@ func (s *LocalTcpServer) Start() error {
 		log.Printf("Error starting local tcp server: %v", err)
 		return err
 	}
-	if listener == nil {
-		listener, err = net.Listen("tcp", ":"+s.ServerPort)
+	if listener != nil {
+		err := listener.Close()
 		if err != nil {
+			log.Printf("Error closing old listener: %v", err)
 			return err
-		}
-		portListenMap.Put(s.ServerPort, listener)
+		} // 关闭旧的监听器
 	}
+	listener, err = net.Listen("tcp", ":"+s.ServerPort)
+	if err != nil {
+		return err
+	}
+	portListenMap.Put(s.ServerPort, listener)
 	s.listener = listener
 	go func() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
 				log.Printf("Error accepting connection: %v", err)
+				if conn != nil {
+					conn.Close()
+				}
 				if errors.Is(err, net.ErrClosed) {
 					break
 				}
@@ -135,6 +193,7 @@ func (s *LocalTcpServer) HandleTcpConnection(conn net.Conn) {
 	stream, err := s.session.OpenStream()
 	if err != nil {
 		s.session.Close()
+		conn.Close()
 		portListenMap.Remove(s.ServerPort)
 		return
 	}

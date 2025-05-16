@@ -29,7 +29,7 @@ jobs:
             ext: .exe
             archive: zip
 
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     env:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}

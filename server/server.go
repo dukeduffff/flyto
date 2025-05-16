@@ -52,6 +52,7 @@ func handleSession(session *yamux.Session) {
 	srv := grpc.NewServer()
 	RegisterFlyToServiceServer(srv, &FlyToServiceServerImpl{session: session})
 	srv.Serve(&yamuxListener{session: session})
+	// 连接断开后的处理
 }
 
 type FlyToServiceServerImpl struct {
@@ -69,6 +70,7 @@ func (f *FlyToServiceServerImpl) Register(ctx context.Context, request *Register
 			log.Println("register client, create error", err)
 			return nil, err
 		}
+		sessionPortMap.AddSessionPort(f.session, info.GetServerPort())
 		if err = ls.Start(); err != nil {
 			log.Println("register client, start error", err)
 			return nil, err

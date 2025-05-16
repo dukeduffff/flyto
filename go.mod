@@ -1,6 +1,6 @@
 module github.com/dukeduffff/flyto
 
-go 1.23.0
+go 1.24.3
 
 require (
 	github.com/hashicorp/yamux v0.1.2 // indirect
