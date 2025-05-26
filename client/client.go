@@ -25,6 +25,10 @@ func (c *Client) Start() error {
 	if err != nil {
 		return fmt.Errorf("dial error: %w", err)
 	}
+	conn, err = common.NewCipherConn(conn, c.c.Key)
+	if err != nil {
+		return fmt.Errorf("cipher conn error: %w", err)
+	}
 	session, err := yamux.Client(conn, nil)
 	if err != nil {
 		return fmt.Errorf("yamux client error: %w", err)
@@ -50,7 +54,7 @@ func (c *Client) Start() error {
 		infos = append(infos, &server.ClientInfo{ServerPort: tmpServerPort, ClientIp: tmpClientIp, ClientPort: tmpClientPort})
 	}
 
-	request := &server.RegisterRequest{ClientId: "default", ClientInfos: infos}
+	request := &server.RegisterRequest{ClientId: "default", CipherKey: c.c.Key, ClientInfos: infos}
 	response, err := client.Register(context.Background(), request)
 	if err != nil || !response.GetStatus() {
 		return fmt.Errorf("register error: %w, status=%v", err, response.Status)
@@ -60,7 +64,7 @@ func (c *Client) Start() error {
 		for {
 			pingRequest := &server.PingRequest{ClientId: "default"}
 			client.Ping(context.Background(), pingRequest)
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 30)
 		}
 	}()
 	// 2. accept new stream

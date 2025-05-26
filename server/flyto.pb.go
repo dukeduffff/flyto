@@ -85,7 +85,8 @@ func (x *ClientInfo) GetClientPort() string {
 type RegisterRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`          // 客户端id
-	ClientInfos   []*ClientInfo          `protobuf:"bytes,2,rep,name=client_infos,json=clientInfos,proto3" json:"client_infos,omitempty"` // 客户端信息
+	CipherKey     string                 `protobuf:"bytes,2,opt,name=cipher_key,json=cipherKey,proto3" json:"cipher_key,omitempty"`       // 加密密钥,用来判断是否合法
+	ClientInfos   []*ClientInfo          `protobuf:"bytes,3,rep,name=client_infos,json=clientInfos,proto3" json:"client_infos,omitempty"` // 客户端信息
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -123,6 +124,13 @@ func (*RegisterRequest) Descriptor() ([]byte, []int) {
 func (x *RegisterRequest) GetClientId() string {
 	if x != nil {
 		return x.ClientId
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetCipherKey() string {
+	if x != nil {
+		return x.CipherKey
 	}
 	return ""
 }
@@ -269,10 +277,12 @@ const file_flyto_proto_rawDesc = "" +
 	"serverPort\x12\x1b\n" +
 	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12\x1f\n" +
 	"\vclient_port\x18\x03 \x01(\tR\n" +
-	"clientPort\"e\n" +
+	"clientPort\"\x84\x01\n" +
 	"\x0fRegisterRequest\x12\x1b\n" +
-	"\tclient_id\x18\x01 \x01(\tR\bclientId\x125\n" +
-	"\fclient_infos\x18\x02 \x03(\v2\x12.server.ClientInfoR\vclientInfos\"*\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x1d\n" +
+	"\n" +
+	"cipher_key\x18\x02 \x01(\tR\tcipherKey\x125\n" +
+	"\fclient_infos\x18\x03 \x03(\v2\x12.server.ClientInfoR\vclientInfos\"*\n" +
 	"\x10RegisterResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\"*\n" +
 	"\vPingRequest\x12\x1b\n" +

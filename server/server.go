@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/dukeduffff/flyto/common"
+	"github.com/google/uuid"
 	"github.com/hashicorp/yamux"
 	"google.golang.org/grpc"
 	"log"
@@ -28,7 +29,12 @@ func (s *Server) Start() error {
 		}
 		go func() {
 			defer conn.Close()
-			handleConn(conn)
+			cipherConn, connErr := common.NewCipherConn(conn, s.c.Key)
+			if connErr != nil {
+				log.Println("Error creating cipher connection", connErr)
+				return
+			}
+			s.handleConn(cipherConn)
 		}()
 	}
 }
@@ -39,18 +45,18 @@ func NewServer(config *common.Config) *Server {
 	}
 }
 
-func handleConn(conn net.Conn) {
+func (s *Server) handleConn(conn net.Conn) {
 	config := yamux.DefaultConfig()
 	session, err := yamux.Server(conn, config)
 	if err != nil {
 		log.Printf("yamux server error: %v", err)
 	}
-	handleSession(session)
+	s.handleSession(session)
 }
 
-func handleSession(session *yamux.Session) {
+func (s *Server) handleSession(session *yamux.Session) {
 	srv := grpc.NewServer()
-	RegisterFlyToServiceServer(srv, &FlyToServiceServerImpl{session: session})
+	RegisterFlyToServiceServer(srv, &FlyToServiceServerImpl{session: session, server: s})
 	srv.Serve(&yamuxListener{session: session})
 	// 连接断开后的处理
 }
@@ -58,19 +64,29 @@ func handleSession(session *yamux.Session) {
 type FlyToServiceServerImpl struct {
 	UnimplementedFlyToServiceServer
 	session *yamux.Session
+	server  *Server
+}
+
+type YamuxSessionWrapper struct {
+	session *yamux.Session
+	id      string
 }
 
 func (f *FlyToServiceServerImpl) Register(ctx context.Context, request *RegisterRequest) (*RegisterResponse, error) {
 	clientId := request.GetClientId()
+	cipherKey := request.GetCipherKey()
+	// 检查客户端是否有授权
+	if f.server.c.Key != cipherKey {
+		return nil, fmt.Errorf("invalid cipher key")
+	}
 	infos := request.GetClientInfos()
 	log.Println("register client", clientId, infos)
 	for _, info := range infos {
-		ls, err := NewLocalServer(clientId, info, f.session)
+		ls, err := NewLocalServer(clientId, info, &YamuxSessionWrapper{session: f.session, id: uuid.New().String()})
 		if err != nil {
 			log.Println("register client, create error", err)
 			return nil, err
 		}
-		sessionPortMap.AddSessionPort(f.session, info.GetServerPort())
 		if err = ls.Start(); err != nil {
 			log.Println("register client, start error", err)
 			return nil, err
@@ -82,7 +98,7 @@ func (f *FlyToServiceServerImpl) Register(ctx context.Context, request *Register
 }
 
 func (f *FlyToServiceServerImpl) Ping(ctx context.Context, request *PingRequest) (*PingResponse, error) {
-	log.Println("ping, clientId:", request.GetClientId())
+	//log.Println("ping, clientId:", request.GetClientId())
 	return &PingResponse{}, nil
 }
 

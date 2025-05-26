@@ -21,6 +21,7 @@ type Config struct {
 	ServerPort        uint16
 	RemoteHostAndPort string
 	LocalHostAndPort  []string
+	Key               string
 }
 
 func getServerPort(c *cmd.Cmd) (uint16, error) {
@@ -58,6 +59,7 @@ func NewServerConfig(cmd *cmd.Cmd) (*Config, error) {
 	return &Config{
 		IsServer:   server,
 		ServerPort: serverPort,
+		Key:        cmd.Key,
 	}, nil
 }
 
@@ -78,5 +80,6 @@ func NewClientConfig(cmd *cmd.Cmd) (*Config, error) {
 		IsServer:          server,
 		RemoteHostAndPort: remoteHostAndPort,
 		LocalHostAndPort:  localHostAndPort,
+		Key:               cmd.Key,
 	}, nil
 }

@@ -13,7 +13,8 @@ message ClientInfo {
 // 定义消息结构体
 message RegisterRequest {
   string client_id = 1; // 客户端id
-  repeated ClientInfo client_infos = 2; // 客户端信息
+  string cipher_key = 2; // 加密密钥,用来判断是否合法
+  repeated ClientInfo client_infos = 3; // 客户端信息
 }
 
 message RegisterResponse {

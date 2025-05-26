@@ -3,6 +3,7 @@ module github.com/dukeduffff/flyto
 go 1.24.3
 
 require (
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	golang.org/x/net v0.39.0 // indirect
