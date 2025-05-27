@@ -21,11 +21,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type NetworkType int32
+
+const (
+	NetworkType_NETWORK_TYPE_TCP NetworkType = 0 // TCP网络
+	NetworkType_NETWORK_TYPE_UDP NetworkType = 1 // UDP网络
+)
+
+// Enum value maps for NetworkType.
+var (
+	NetworkType_name = map[int32]string{
+		0: "NETWORK_TYPE_TCP",
+		1: "NETWORK_TYPE_UDP",
+	}
+	NetworkType_value = map[string]int32{
+		"NETWORK_TYPE_TCP": 0,
+		"NETWORK_TYPE_UDP": 1,
+	}
+)
+
+func (x NetworkType) Enum() *NetworkType {
+	p := new(NetworkType)
+	*p = x
+	return p
+}
+
+func (x NetworkType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NetworkType) Descriptor() protoreflect.EnumDescriptor {
+	return file_flyto_proto_enumTypes[0].Descriptor()
+}
+
+func (NetworkType) Type() protoreflect.EnumType {
+	return &file_flyto_proto_enumTypes[0]
+}
+
+func (x NetworkType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NetworkType.Descriptor instead.
+func (NetworkType) EnumDescriptor() ([]byte, []int) {
+	return file_flyto_proto_rawDescGZIP(), []int{0}
+}
+
 type ClientInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ServerPort    string                 `protobuf:"bytes,1,opt,name=server_port,json=serverPort,proto3" json:"server_port,omitempty"` // 服务器端口
-	ClientIp      string                 `protobuf:"bytes,2,opt,name=client_ip,json=clientIp,proto3" json:"client_ip,omitempty"`       // 客户端ip
-	ClientPort    string                 `protobuf:"bytes,3,opt,name=client_port,json=clientPort,proto3" json:"client_port,omitempty"` // 客户端端口
+	ServerPort    string                 `protobuf:"bytes,1,opt,name=server_port,json=serverPort,proto3" json:"server_port,omitempty"`                             // 服务器端口
+	ClientIp      string                 `protobuf:"bytes,2,opt,name=client_ip,json=clientIp,proto3" json:"client_ip,omitempty"`                                   // 客户端ip
+	ClientPort    string                 `protobuf:"bytes,3,opt,name=client_port,json=clientPort,proto3" json:"client_port,omitempty"`                             // 客户端端口
+	NetworkType   NetworkType            `protobuf:"varint,4,opt,name=network_type,json=networkType,proto3,enum=server.NetworkType" json:"network_type,omitempty"` // 网络类型
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -79,6 +126,13 @@ func (x *ClientInfo) GetClientPort() string {
 		return x.ClientPort
 	}
 	return ""
+}
+
+func (x *ClientInfo) GetNetworkType() NetworkType {
+	if x != nil {
+		return x.NetworkType
+	}
+	return NetworkType_NETWORK_TYPE_TCP
 }
 
 // 定义消息结构体
@@ -270,14 +324,15 @@ var File_flyto_proto protoreflect.FileDescriptor
 
 const file_flyto_proto_rawDesc = "" +
 	"\n" +
-	"\vflyto.proto\x12\x06server\"k\n" +
+	"\vflyto.proto\x12\x06server\"\xa3\x01\n" +
 	"\n" +
 	"ClientInfo\x12\x1f\n" +
 	"\vserver_port\x18\x01 \x01(\tR\n" +
 	"serverPort\x12\x1b\n" +
 	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12\x1f\n" +
 	"\vclient_port\x18\x03 \x01(\tR\n" +
-	"clientPort\"\x84\x01\n" +
+	"clientPort\x126\n" +
+	"\fnetwork_type\x18\x04 \x01(\x0e2\x13.server.NetworkTypeR\vnetworkType\"\x84\x01\n" +
 	"\x0fRegisterRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x1d\n" +
 	"\n" +
@@ -287,7 +342,10 @@ const file_flyto_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\bR\x06status\"*\n" +
 	"\vPingRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\"\x0e\n" +
-	"\fPingResponse2\x80\x01\n" +
+	"\fPingResponse*9\n" +
+	"\vNetworkType\x12\x14\n" +
+	"\x10NETWORK_TYPE_TCP\x10\x00\x12\x14\n" +
+	"\x10NETWORK_TYPE_UDP\x10\x012\x80\x01\n" +
 	"\fFlyToService\x12=\n" +
 	"\bRegister\x12\x17.server.RegisterRequest\x1a\x18.server.RegisterResponse\x121\n" +
 	"\x04Ping\x12\x13.server.PingRequest\x1a\x14.server.PingResponseB(Z&github.com/john/myproject/flyto;serverb\x06proto3"
@@ -304,25 +362,28 @@ func file_flyto_proto_rawDescGZIP() []byte {
 	return file_flyto_proto_rawDescData
 }
 
+var file_flyto_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_flyto_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_flyto_proto_goTypes = []any{
-	(*ClientInfo)(nil),       // 0: server.ClientInfo
-	(*RegisterRequest)(nil),  // 1: server.RegisterRequest
-	(*RegisterResponse)(nil), // 2: server.RegisterResponse
-	(*PingRequest)(nil),      // 3: server.PingRequest
-	(*PingResponse)(nil),     // 4: server.PingResponse
+	(NetworkType)(0),         // 0: server.NetworkType
+	(*ClientInfo)(nil),       // 1: server.ClientInfo
+	(*RegisterRequest)(nil),  // 2: server.RegisterRequest
+	(*RegisterResponse)(nil), // 3: server.RegisterResponse
+	(*PingRequest)(nil),      // 4: server.PingRequest
+	(*PingResponse)(nil),     // 5: server.PingResponse
 }
 var file_flyto_proto_depIdxs = []int32{
-	0, // 0: server.RegisterRequest.client_infos:type_name -> server.ClientInfo
-	1, // 1: server.FlyToService.Register:input_type -> server.RegisterRequest
-	3, // 2: server.FlyToService.Ping:input_type -> server.PingRequest
-	2, // 3: server.FlyToService.Register:output_type -> server.RegisterResponse
-	4, // 4: server.FlyToService.Ping:output_type -> server.PingResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: server.ClientInfo.network_type:type_name -> server.NetworkType
+	1, // 1: server.RegisterRequest.client_infos:type_name -> server.ClientInfo
+	2, // 2: server.FlyToService.Register:input_type -> server.RegisterRequest
+	4, // 3: server.FlyToService.Ping:input_type -> server.PingRequest
+	3, // 4: server.FlyToService.Register:output_type -> server.RegisterResponse
+	5, // 5: server.FlyToService.Ping:output_type -> server.PingResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_flyto_proto_init() }
@@ -335,13 +396,14 @@ func file_flyto_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_flyto_proto_rawDesc), len(file_flyto_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_flyto_proto_goTypes,
 		DependencyIndexes: file_flyto_proto_depIdxs,
+		EnumInfos:         file_flyto_proto_enumTypes,
 		MessageInfos:      file_flyto_proto_msgTypes,
 	}.Build()
 	File_flyto_proto = out.File

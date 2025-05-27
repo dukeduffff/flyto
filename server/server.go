@@ -24,7 +24,7 @@ func (s *Server) Start() error {
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connection", err)
+			log.Println("Error accepting connection", err)
 			continue
 		}
 		go func() {
@@ -81,14 +81,28 @@ func (f *FlyToServiceServerImpl) Register(ctx context.Context, request *Register
 	}
 	infos := request.GetClientInfos()
 	log.Println("register client", clientId, infos)
+	var components []common.Component
 	for _, info := range infos {
-		ls, err := NewLocalServer(clientId, info, &YamuxSessionWrapper{session: f.session, id: uuid.New().String()})
+		var component common.Component
+		var err error
+		if info.GetNetworkType() == NetworkType_NETWORK_TYPE_TCP {
+			component, err = NewLocalTcpServer(clientId, info, &YamuxSessionWrapper{session: f.session, id: uuid.New().String()})
+		} else if info.GetNetworkType() == NetworkType_NETWORK_TYPE_UDP {
+			component, err = NewLocalUdpServer(clientId, info, &YamuxSessionWrapper{session: f.session, id: uuid.New().String()})
+		}
+		if component == nil {
+			return nil, fmt.Errorf("create component error: %v", info)
+		}
 		if err != nil {
 			log.Println("register client, create error", err)
 			return nil, err
 		}
-		if err = ls.Start(); err != nil {
-			log.Println("register client, start error", err)
+		components = append(components, component)
+	}
+	for _, component := range components {
+		err := component.Start()
+		if err != nil {
+			log.Printf("component start error: %v", err)
 			return nil, err
 		}
 	}

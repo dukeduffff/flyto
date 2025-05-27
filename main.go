@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/dukeduffff/flyto/client"
 	"github.com/dukeduffff/flyto/cmd"
 	"github.com/dukeduffff/flyto/common"
@@ -24,7 +23,7 @@ func main() {
 		}
 		client := client.NewClient(clientConfig)
 		if err := client.Start(); err != nil {
-			fmt.Println("client start error", err)
+			log.Println("client start error", err)
 		}
 	} else if isServer {
 		config, err := common.NewServerConfig(cmd)

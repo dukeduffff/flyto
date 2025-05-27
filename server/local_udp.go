@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/dukeduffff/flyto/common"
 	"github.com/dukeduffff/flyto/utils"
-	"io"
 	"log"
 	"math/rand"
 	"net"
@@ -13,99 +12,107 @@ import (
 	"time"
 )
 
-var portTcpServerMap = &utils.Map[string, LocalTcpServer]{}
+var portUdpServerMap = &utils.Map[string, LocalUdpServer]{}
 
-type LocalTcpServer struct {
+type LocalUdpServer struct {
 	ServerPort        string
-	listener          net.Listener
-	ForwardClientList []*ForwardTcpClient
+	udpConn           net.PacketConn
+	ForwardClientList []*ForwardUdpClient
 	lock              sync.RWMutex
 	initialized       bool
-	common.Component
+	CloseChan         chan struct{}
 }
 
-func NewLocalTcpServer(clientId string, clientInfo *ClientInfo, sw *YamuxSessionWrapper) (*LocalTcpServer, error) {
+func NewLocalUdpServer(clientId string, clientInfo *ClientInfo, sw *YamuxSessionWrapper) (*LocalUdpServer, error) {
 	clientPort, err := strconv.Atoi(clientInfo.GetClientPort())
 	if err != nil {
 		return nil, err
 	}
-	f := &ForwardTcpClient{
+	f := &ForwardUdpClient{
 		ClientId:    clientId,
 		ClientIp:    clientInfo.GetClientIp(),
 		ClientPort:  clientPort,
-		NetworkType: common.TCP,
+		NetworkType: common.UDP,
 		session:     sw,
 	}
 	serverPort := clientInfo.GetServerPort()
-	tcpServer := portTcpServerMap.Get(&serverPort)
-	if tcpServer == nil {
-		tcpServer = &LocalTcpServer{
+	udpServer := portUdpServerMap.Get(&serverPort)
+	if udpServer == nil {
+		udpServer = &LocalUdpServer{
 			ServerPort: clientInfo.GetServerPort(),
+			CloseChan:  make(chan struct{}, 1),
 		}
-		if ok := portTcpServerMap.Put(&serverPort, tcpServer); !ok {
+		if ok := portUdpServerMap.Put(&serverPort, udpServer); !ok {
 			// 此时可能是另一个协程已经创建了这个端口的LocalTcpServer
-			tcpServer = portTcpServerMap.Get(&serverPort)
+			udpServer = portUdpServerMap.Get(&serverPort)
 		}
 	}
 	// 关闭session
-	go func(tcpServer *LocalTcpServer) {
+	go func(udpServer *LocalUdpServer) {
 		<-sw.session.CloseChan()
-		for _, client := range tcpServer.ForwardClientList {
+		for _, client := range udpServer.ForwardClientList {
 			if client.session.id != sw.id {
 				continue
 			}
-			tcpServer.RemoveForwardClient(client)
+			udpServer.RemoveForwardClient(client)
 		}
-	}(tcpServer)
-	tcpServer.AddForwardClient(f)
-	return tcpServer, nil
+	}(udpServer)
+	udpServer.AddForwardClient(f)
+	return udpServer, nil
 }
 
-func (s *LocalTcpServer) Start() error {
+func (s *LocalUdpServer) Start() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if s.initialized {
 		return nil
 	}
-	listener, err := net.Listen("tcp", ":"+s.ServerPort)
+	conn, err := net.ListenPacket("udp", ":"+s.ServerPort)
 	if err != nil {
 		return err
 	}
-	s.listener = listener
+	s.udpConn = conn
 	go func() {
+		buffer := make([]byte, 65507)
+	loop:
 		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				listener.Close()
-				log.Printf("Error accepting connection: %v", err)
-				if conn != nil {
-					conn.Close()
-				}
-				break
+			select {
+			case <-s.CloseChan:
+				break loop
+			default:
 			}
-			go s.HandleTcpConnection(conn)
+			n, addr, err := conn.ReadFrom(buffer)
+			if err != nil {
+				log.Printf("Error reading from UDP connection: %v\n", err)
+				continue
+			}
+			data := buffer[:n]
+			go s.HandleUdpData(conn, data, addr)
 		}
 	}()
 	s.initialized = true
 	return nil
 }
 
-func (s *LocalTcpServer) HandleTcpConnection(conn net.Conn) {
+func (s *LocalUdpServer) HandleUdpData(conn net.PacketConn, data []byte, addr net.Addr) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	index := r.Intn(len(s.ForwardClientList))
 	client := s.ForwardClientList[index]
-	client.HandleTcpConnection(conn)
+	client.HandleUdpConnection(conn, data, addr)
 }
 
-func (s *LocalTcpServer) AddForwardClient(client *ForwardTcpClient) {
+func (s *LocalUdpServer) AddForwardClient(client *ForwardUdpClient) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.ForwardClientList = append(s.ForwardClientList, client)
 }
 
-func (s *LocalTcpServer) RemoveForwardClient(client *ForwardTcpClient) {
+func (s *LocalUdpServer) RemoveForwardClient(client *ForwardUdpClient) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	if len(s.ForwardClientList) == 0 {
+		return
+	}
 	for i, c := range s.ForwardClientList {
 		log.Printf("Removing client %s from server %s\n", c.ClientId, s.ServerPort)
 		if c.session.id == client.session.id {
@@ -118,15 +125,16 @@ func (s *LocalTcpServer) RemoveForwardClient(client *ForwardTcpClient) {
 	}
 }
 
-func (s *LocalTcpServer) Close() error {
-	portTcpServerMap.Remove(&s.ServerPort)
-	if err := s.listener.Close(); err != nil {
+func (s *LocalUdpServer) Close() error {
+	s.CloseChan <- struct{}{}
+	portUdpServerMap.Remove(&s.ServerPort)
+	if err := s.udpConn.Close(); err != nil {
 		return err
 	}
 	return nil
 }
 
-type ForwardTcpClient struct {
+type ForwardUdpClient struct {
 	ClientId    string
 	ClientIp    string
 	ClientPort  int
@@ -134,7 +142,7 @@ type ForwardTcpClient struct {
 	session     *YamuxSessionWrapper
 }
 
-func (f *ForwardTcpClient) GetHeader() *bytes.Buffer {
+func (f *ForwardUdpClient) GetHeader() *bytes.Buffer {
 	buf := &bytes.Buffer{}
 	/**
 	VER: 0x05
@@ -144,7 +152,7 @@ func (f *ForwardTcpClient) GetHeader() *bytes.Buffer {
 	DST.ADDR: 目标地址
 	DST.PORT: 目标端口(大端)
 	*/
-	buf.Write([]byte{0x06, 0x01, 0x00, 0x01}) // VER, CMD, RSV, ATYP=domain
+	buf.Write([]byte{0x06, 0x01, 0x01, 0x01}) // VER, CMD, RSV, ATYP=domain
 	buf.WriteByte(byte(len(f.ClientIp)))      // 域名长度
 	buf.WriteString(f.ClientIp)               // 域名内容
 	buf.WriteByte(byte(f.ClientPort >> 8))    // 端口高字节
@@ -152,7 +160,7 @@ func (f *ForwardTcpClient) GetHeader() *bytes.Buffer {
 	return buf
 }
 
-func (f *ForwardTcpClient) HandleTcpConnection(conn net.Conn) {
+func (f *ForwardUdpClient) HandleUdpConnection(conn net.PacketConn, data []byte, addr net.Addr) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("捕获panic:", r)
@@ -162,39 +170,34 @@ func (f *ForwardTcpClient) HandleTcpConnection(conn net.Conn) {
 	session := f.session.session
 	stream, err := session.OpenStream()
 	if err != nil {
-		session.Close()
-		conn.Close()
+		stream.Close()
 		return
 	}
-	stream.Write(f.GetHeader().Bytes())
-	prConn, pwConn := io.Pipe()
-	prStream, pwStream := io.Pipe()
-
+	err = stream.SetDeadline(time.Now().Add(time.Second * 5))
+	if err != nil {
+		stream.Close()
+		return
+	}
 	var once sync.Once
 	closeAll := func() {
-		conn.Close()
 		stream.Close()
-		prConn.Close()
-		pwConn.Close()
-		prStream.Close()
-		pwStream.Close()
 	}
-	// server write to client
 	go func() {
-		io.Copy(pwConn, conn)
+		buffer := make([]byte, 65507)
+		for {
+			n, err2 := stream.Read(buffer)
+			if err2 != nil {
+				log.Printf("Error reading udp from tcp connection: %v\n", err2)
+				break
+			}
+			conn.WriteTo(buffer[:n], addr)
+		}
 		once.Do(closeAll)
 	}()
-	go func() {
-		io.Copy(stream, prConn)
+	if _, err := stream.Write(f.GetHeader().Bytes()); err != nil {
 		once.Do(closeAll)
-	}()
-	// read from client
-	go func() {
-		io.Copy(pwStream, stream)
+	}
+	if _, err := stream.Write(data); err != nil {
 		once.Do(closeAll)
-	}()
-	go func() {
-		io.Copy(conn, prStream)
-		once.Do(closeAll)
-	}()
+	}
 }

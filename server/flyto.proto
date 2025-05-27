@@ -4,10 +4,16 @@ syntax = "proto3";
 option go_package = "github.com/john/myproject/flyto;server";
 package server;
 
+enum NetworkType {
+  NETWORK_TYPE_TCP = 0; // TCP网络
+  NETWORK_TYPE_UDP = 1; // UDP网络
+}
+
 message ClientInfo {
   string server_port = 1; // 服务器端口
   string client_ip = 2; // 客户端ip
   string client_port = 3; // 客户端端口
+  NetworkType network_type = 4; // 网络类型
 }
 
 // 定义消息结构体
