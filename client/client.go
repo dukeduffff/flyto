@@ -17,28 +17,52 @@ import (
 )
 
 type Client struct {
-	c *common.Config
+	c       *common.Config
+	cntChan chan struct{}
+}
+
+func NewClient(config *common.Config) *Client {
+	cnt := config.ConnectCnt
+	c := &Client{
+		c:       config,
+		cntChan: make(chan struct{}, cnt),
+	}
+	for i := 0; i < cnt; i++ {
+		c.cntChan <- struct{}{}
+	}
+	return c
 }
 
 func (c *Client) Start() error {
 	for {
-		conn, err := net.Dial("tcp", c.c.RemoteHostAndPort)
-		if err != nil {
-			return fmt.Errorf("dial error: %w", err)
-		}
-		conn, err = common.NewCipherConn(conn, c.c.Key)
-		if err != nil {
-			return fmt.Errorf("cipher conn error: %w", err)
-		}
-		session, err := yamux.Client(conn, nil)
-		if err != nil {
-			return fmt.Errorf("yamux client error: %w", err)
-		}
-		c.doStart(session)
-		log.Printf("last connect to %s lost, waiting for 5 seconds before reconnecting...\n", c.c.RemoteHostAndPort)
-		time.Sleep(5 * time.Second)
+		<-c.cntChan
+		go func() {
+			conn, err := net.Dial("tcp", c.c.RemoteHostAndPort)
+			if err != nil {
+				c.waitAndRestart(err)
+				return
+			}
+			conn, err = common.NewCipherConn(conn, c.c.Key)
+			if err != nil {
+				c.waitAndRestart(err)
+				return
+			}
+			session, err := yamux.Client(conn, yamux.DefaultConfig())
+			if err != nil {
+				c.waitAndRestart(err)
+				return
+			}
+			err = c.doStart(session)
+			c.waitAndRestart(err)
+		}()
 	}
 	return nil
+}
+
+func (c *Client) waitAndRestart(err error) {
+	log.Printf("last connect to %s lost, err=%v, waiting for 5 seconds before reconnecting...\n", c.c.RemoteHostAndPort, err)
+	time.Sleep(5 * time.Second)
+	c.cntChan <- struct{}{} // Replenish the channel
 }
 
 func (c *Client) doStart(session *yamux.Session) error {
@@ -76,13 +100,17 @@ func (c *Client) doStart(session *yamux.Session) error {
 		return fmt.Errorf("register error: %w, status=%v", err, response.GetStatus())
 	}
 	// ping
-	go func() {
-		for {
-			pingRequest := &server.PingRequest{ClientId: "default"}
-			client.Ping(context.Background(), pingRequest)
-			time.Sleep(time.Second * 30)
-		}
-	}()
+	//go func() {
+	//	for {
+	//		duration, err2 := session.Ping()
+	//		if err2 != nil {
+	//			log.Printf("ping error: %v, duration=%v", err2, duration)
+	//		}
+	//		//pingRequest := &server.PingRequest{ClientId: "default"}
+	//		//client.Ping(context.Background(), pingRequest)
+	//		time.Sleep(time.Second * 30)
+	//	}
+	//}()
 	// 2. accept new stream
 	c.handleSession(session)
 	return nil
@@ -216,10 +244,4 @@ func (c *Client) handleUdp(domain string, port uint16, stream net.Conn) error {
 		once.Do(closeAll)
 	}()
 	return nil
-}
-
-func NewClient(config *common.Config) *Client {
-	return &Client{
-		c: config,
-	}
 }

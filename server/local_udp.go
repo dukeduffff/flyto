@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var portUdpServerMap = &utils.Map[string, LocalUdpServer]{}
+var portUdpServerMap = &utils.Map[string, *LocalUdpServer]{}
 
 type LocalUdpServer struct {
 	ServerPort        string
@@ -36,15 +36,15 @@ func NewLocalUdpServer(clientId string, clientInfo *ClientInfo, sw *YamuxSession
 		session:     sw,
 	}
 	serverPort := clientInfo.GetServerPort()
-	udpServer := portUdpServerMap.Get(&serverPort)
-	if udpServer == nil {
+	udpServer, ok := portUdpServerMap.Get(serverPort)
+	if !ok {
 		udpServer = &LocalUdpServer{
 			ServerPort: clientInfo.GetServerPort(),
 			CloseChan:  make(chan struct{}, 1),
 		}
-		if ok := portUdpServerMap.Put(&serverPort, udpServer); !ok {
+		if ok := portUdpServerMap.Put(serverPort, udpServer); !ok {
 			// 此时可能是另一个协程已经创建了这个端口的LocalTcpServer
-			udpServer = portUdpServerMap.Get(&serverPort)
+			udpServer, _ = portUdpServerMap.Get(serverPort)
 		}
 	}
 	// 关闭session
@@ -127,7 +127,7 @@ func (s *LocalUdpServer) RemoveForwardClient(client *ForwardUdpClient) {
 
 func (s *LocalUdpServer) Close() error {
 	s.CloseChan <- struct{}{}
-	portUdpServerMap.Remove(&s.ServerPort)
+	portUdpServerMap.Remove(s.ServerPort)
 	if err := s.udpConn.Close(); err != nil {
 		return err
 	}

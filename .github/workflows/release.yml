@@ -2,9 +2,10 @@ name: Build Binaries
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - '*'
+#  pull_request:
+#    branches: [ main ]
   workflow_dispatch:
 
 jobs:

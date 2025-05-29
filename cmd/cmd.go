@@ -10,15 +10,17 @@ type Cmd struct {
 	RemoteHostAndPort string
 	LocalHostAndPort  string
 	Key               string
+	ConnectCnt        int
 }
 
 func ParseCmd() *Cmd {
 	cmd := &Cmd{}
-	pflag.StringVarP(&cmd.Mode, "mode", "m", "", "服务类型, client or server")
-	pflag.StringVarP(&cmd.ServerPort, "serverPort", "s", "", "server端监听端口")
-	pflag.StringVarP(&cmd.RemoteHostAndPort, "remoteHostAndPort", "r", "", "client端配置的远程服务端口")
-	pflag.StringVarP(&cmd.LocalHostAndPort, "localHostAndPort", "l", "", "client端配置的本地服务端口")
-	pflag.StringVarP(&cmd.Key, "key", "k", "", "加密密钥,为空则不使用加密 生成方式: openssl rand -base64 16")
+	pflag.StringVarP(&cmd.Mode, "mode", "m", "", "mode, c: client model; s: server model")
+	pflag.StringVarP(&cmd.ServerPort, "server_port", "s", "", "server listen port, only used in server mode")
+	pflag.StringVarP(&cmd.RemoteHostAndPort, "remote_host", "r", "", "remote server host and port, only used in client mode")
+	pflag.StringVarP(&cmd.LocalHostAndPort, "local_host", "l", "", "local host and port, only used in client mode")
+	pflag.IntVarP(&cmd.ConnectCnt, "connect_cnt", "c", 1, "number of connections, only used in client mode")
+	pflag.StringVarP(&cmd.Key, "key", "k", "", "Encryption key; if left empty, encryption and legitimacy verification will not be used. Generation method: openssl rand -base64 16")
 	pflag.Parse()
 	return cmd
 }

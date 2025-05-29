@@ -32,6 +32,8 @@ func main() {
 			return
 		}
 		server := server.NewServer(config)
-		server.Start()
+		if err := server.Start(); err != nil {
+			log.Println("server start error", err)
+		}
 	}
 }

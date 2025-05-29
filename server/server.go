@@ -57,8 +57,9 @@ func (s *Server) handleConn(conn net.Conn) {
 func (s *Server) handleSession(session *yamux.Session) {
 	srv := grpc.NewServer()
 	RegisterFlyToServiceServer(srv, &FlyToServiceServerImpl{session: session, server: s})
-	srv.Serve(&yamuxListener{session: session})
+	err := srv.Serve(&yamuxListener{session: session})
 	// 连接断开后的处理
+	log.Printf("yamux server error: %v", err)
 }
 
 type FlyToServiceServerImpl struct {

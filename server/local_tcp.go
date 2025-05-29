@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var portTcpServerMap = &utils.Map[string, LocalTcpServer]{}
+var portTcpServerMap = &utils.Map[string, *LocalTcpServer]{}
 
 type LocalTcpServer struct {
 	ServerPort        string
@@ -37,14 +37,14 @@ func NewLocalTcpServer(clientId string, clientInfo *ClientInfo, sw *YamuxSession
 		session:     sw,
 	}
 	serverPort := clientInfo.GetServerPort()
-	tcpServer := portTcpServerMap.Get(&serverPort)
-	if tcpServer == nil {
+	tcpServer, ok := portTcpServerMap.Get(serverPort)
+	if !ok {
 		tcpServer = &LocalTcpServer{
 			ServerPort: clientInfo.GetServerPort(),
 		}
-		if ok := portTcpServerMap.Put(&serverPort, tcpServer); !ok {
+		if ok := portTcpServerMap.Put(serverPort, tcpServer); !ok {
 			// 此时可能是另一个协程已经创建了这个端口的LocalTcpServer
-			tcpServer = portTcpServerMap.Get(&serverPort)
+			tcpServer, _ = portTcpServerMap.Get(serverPort)
 		}
 	}
 	// 关闭session
@@ -119,7 +119,7 @@ func (s *LocalTcpServer) RemoveForwardClient(client *ForwardTcpClient) {
 }
 
 func (s *LocalTcpServer) Close() error {
-	portTcpServerMap.Remove(&s.ServerPort)
+	portTcpServerMap.Remove(s.ServerPort)
 	if err := s.listener.Close(); err != nil {
 		return err
 	}
